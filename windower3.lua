@@ -3,9 +3,11 @@ _addon.author  = 'Thorny, concept and sounds by Nsane';
 _addon.version = '1.0'
 
 local packets = require('packets');
+local res = require('resources');
 local settings = {
-    DetectParty = false,
-    DetectAlliance = false
+    Debug = false,
+    DetectParty = true,
+    DetectAlliance = true
 };
 
 local triggers = {
@@ -113,12 +115,19 @@ local function GetTriggerIds()
 end
 
 local function EvaluateTriggers(category, key)
-    print(string.format('Triggered!  Category:%s Param:%s', category, tostring(key)));
     local triggerTable = triggers[category];
     local trigger = triggerTable[key];
     if trigger then
-        windower.play_sound(windower.addon_path .. "FFaudio/" .. trigger);
+        if settings.Debug then
+            print(string.format('Triggered!  Category:%s Param:%s File:%s', category, tostring(key), trigger));
+        end
+        windower.play_sound(string.format("%sresources/audio/%s", windower.addon_path, trigger));
         return true;
+    else
+        if settings.Debug then
+            print(string.format('Triggered!  Category:%s Param:%s File:None', category, tostring(key)));
+        end
+        return false;
     end
 end
 
@@ -134,10 +143,9 @@ windower.register_event('incoming chunk', function(id, data)
 
                 for _, action in ipairs(target.Actions) do
                     local messageId = action.Message;
-                                        
                     if (T { 43, 675 }:contains(messageId)) then
                         local param = action.Param;
-                        local skillData = param < 256 and res.weapon_skills[param] or res.monster_skills[param];
+                        local skillData = param < 256 and res.weapon_skills[param] or res.monster_abilities[param];
                         if skillData then
                             EvaluateTriggers("MobReadies", skillData.en);
                         end
@@ -228,7 +236,7 @@ windower.register_event('incoming chunk', function(id, data)
                             end
                         end
 
-                        --Spell damage taken..
+                    --Spell damage taken..
                     elseif T { 2, 7, 252 }:contains(messageId) then
                         if EvaluateTriggers("DebuffingBySpell", packet.Id) == false then
                             local spellData = res.spells[packet.Id];
