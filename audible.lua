@@ -3,7 +3,7 @@ if AshitaCore then
 elseif ashita then
     require('ashita3');
 elseif windower then
-    require('windower3');
+    require('windower4');
 else
     print('Could not detect platform.');
 end

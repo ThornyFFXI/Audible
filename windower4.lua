@@ -2,8 +2,8 @@ _addon.name    = 'Audible'
 _addon.author  = 'Thorny, concept and sounds by Nsane';
 _addon.version = '1.0'
 
-local packets = require('packets');
-local res = require('resources');
+local packets  = require('packets');
+local res      = require('resources');
 local settings = {
     Debug = false,
     DetectParty = true,
@@ -236,7 +236,7 @@ windower.register_event('incoming chunk', function(id, data)
                             end
                         end
 
-                    --Spell damage taken..
+                        --Spell damage taken..
                     elseif T { 2, 7, 252 }:contains(messageId) then
                         if EvaluateTriggers("DebuffingBySpell", packet.Id) == false then
                             local spellData = res.spells[packet.Id];
@@ -251,11 +251,11 @@ windower.register_event('incoming chunk', function(id, data)
             end
         end
     end
-    
+
     if id == 0x029 then
         local action_message = packets.parse('incoming', data);
         local ids = GetTriggerIds();
-        if (action_message['Actor'] == ids[1]) and T{64, 204, 206, 321, 322, 341, 342, 343, 344, 350, 351, 378, 531, 647}:contains(action_message.Message) then
+        if (action_message['Actor'] == ids[1]) and T { 64, 204, 206, 321, 322, 341, 342, 343, 344, 350, 351, 378, 531, 647 }:contains(action_message.Message) then
             if EvaluateTriggers("LostBuff", action_message['Param 1']) == false then
                 local buffData = res.buffs[action_message['Param 1']];
                 if buffData then
