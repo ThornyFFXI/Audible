@@ -1,6 +1,7 @@
 --[[
     This triggers when a mob begins casting a spell or readies a weaponskill or job ability.
     If any of the listed abilities are present, the matching sound will be played.
+    You must use names not IDs, since all actions are converted to text prior to this check [Abilities, WS, and Spells all have different IDs.]
 ]]--
 
 return {

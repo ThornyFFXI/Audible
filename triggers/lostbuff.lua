@@ -1,5 +1,10 @@
+--[[
+    This triggers when you lose a buff or one of your applied debuffs expires.
+    You can specify buffs by either the buff name(must be exactly the same as game uses) or the ID.
+]]--
+
 return {
-    [36] = "Blink.wav",
+    ['Blink'] = "Blink.wav",
     --[37] = "Stoneskin.wav",
     [39] = "Aquaveil.wav",
     [40] = "Protect.wav",

@@ -180,7 +180,7 @@ windower.register_event('incoming chunk', function(id, data)
 
                         --Monster uses weaponskill..
                     elseif (T { 101, 135 }:contains(messageId)) then
-                        local wsData = res.weapon_skills[packet.Id];
+                        local wsData = res.monster_abilities[packet.Id];
                         if wsData then
                             EvaluateTriggers("MobUses", wsData.en);
                         end

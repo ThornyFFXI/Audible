@@ -1,6 +1,7 @@
 --[[
     This file contains triggers for miscellaneous message IDs when they are relating to yourself.
     Any message ID where the actor is yourself from 0x28 or 0x29 will trigger these.
+    The resource file located at 'windower/res/action_messages.lua' has the IDs this uses.
 ]]--
 
 return {

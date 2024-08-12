@@ -1,5 +1,6 @@
 --[[
-    This triggers when a mob finishes activating an ability, spell, or weaponskill.
+    This triggers when a mob finishes activating an ability or weaponskill.
+    You must use names not IDs, since all actions are converted to text prior to this check [Abilities and WS have different IDs.]
 ]]--
 
 return {

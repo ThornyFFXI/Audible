@@ -1,6 +1,6 @@
 --[[
     Entries here trigger when you or a party/alliance member(if enabled) cast a spell that states the debuff on a monster.
-    If the status effect is in the list, the sound effect will play.
+    This is intended for spells that explicitly state the debuff, such as 'Player casts paralyze.  Mob is paralyzed.'.
     Status effects can be listed by ID or by name.  If both are present, ID takes priority.
 ]]--
 
