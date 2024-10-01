@@ -2,25 +2,69 @@ _addon.name    = 'Audible'
 _addon.author  = 'Thorny, concept and sounds by Nsane';
 _addon.version = '1.0'
 
+local message  = require('messagedat');
 local packets  = require('packets');
 local res      = require('resources');
+local wildcard = require('wildcard');
 local settings = {
-    Debug = false,
+    Debug = true,
     DetectParty = true,
     DetectAlliance = true
 };
 
+
 local triggers = {
+    AllText = require('triggers.alltext'),
+    Chat = require('triggers.chat'),
+    ChatMon = require('triggers.chatmon'),
     DebuffedByStatus = require('triggers.debuffedbystatus'),
     DebuffingByStatus = require('triggers.debuffingbystatus'),
     DebuffedBySpell = require('triggers.debuffedbyspell'),
     DebuffingBySpell = require('triggers.debuffingbyspell'),
     LostBuff = require('triggers.lostbuff'),
+    LostDebuff = require('triggers.lostdebuff'),
+    MessageDat = require('triggers.messagedat'),
     MiscActions = require('triggers.miscactions'),
+    MobDispelled = require('triggers.mobdispelled'),
     MobReadies = require('triggers.mobreadies'),
     MobUses = require('triggers.mobuses'),
     TreasureHunterUpgrade = require('triggers.treasurehunterupgrade'),
 };
+
+local function BuildPattern(entry, name)
+    if (entry.Wildcard ~= nil) then
+        if entry.CaseSensitive ~= true then
+            entry.ProcessedWildcard = wildcard:Convert(string.gsub(string.lower(entry.Wildcard), '%$name', string.lower(name)));
+        else
+            entry.ProcessedWildcard = wildcard:Convert(string.gsub(entry.Wildcard, '%$name', name));
+        end
+    end
+    if (entry.Pattern ~= nil) then
+        if entry.CaseSensitive ~= true then
+            entry.ProcessedPattern = string.gsub(string.lower(entry.Pattern), '%$name', string.lower(name));
+        else
+            entry.ProcessedPattern = string.gsub(entry.Pattern, '%$name', name);
+        end
+    end
+    if type(entry.Mode) == 'table' then
+        entry.Mode = T(entry.Mode);
+    end
+end
+
+local function BuildPatterns(name)
+    for _,entry in ipairs(triggers.Chat) do
+        BuildPattern(entry, name);
+    end
+    for _,entry in ipairs(triggers.AllText) do
+        BuildPattern(entry, name);
+    end
+end
+local currentName;
+do
+    local player = windower.ffxi.get_player();
+    currentName = player and string.lower(player.name) or '$name';
+    BuildPatterns(currentName);
+end
 
 local function ParseActionPacket(data)
     local bitData = data;
@@ -131,7 +175,76 @@ local function EvaluateTriggers(category, key)
     end
 end
 
+local function EvaluateChatEntry(entry, params)
+    local message = (entry.CaseSensitive == true) and params.Message or params.LowerMessage;
+
+    if (entry.ProcessedWildcard ~= nil) then
+        if not string.match(message, entry.ProcessedWildcard) then
+            return false;
+        end
+    end
+    if (entry.ProcessedPattern ~= nil) then
+        if not string.match(message, entry.ProcessedPattern) then
+            return false;
+        end
+    end
+
+    if (entry.Mode ~= nil) then
+        if type(entry.Mode) == 'table' then
+            if (entry.Mode:contains(params.Mode) == false) then
+                return false;
+            end
+        elseif (entry.Mode ~= params.Mode) then
+            return false;
+        end
+    end
+
+    if (entry.Sender ~= nil) and (string.lower(entry.Sender) ~= params.Sender) then
+        return false;
+    end
+
+    return true;
+end
+local function EvaluateChat(params)
+    for _,entry in ipairs(triggers.Chat) do
+        if EvaluateChatEntry(entry, params) and type(entry.Sound) == 'string' then
+            windower.play_sound(string.format("%sresources/audio/%s", windower.addon_path, entry.Sound));
+            if settings.Debug then
+                print(string.format('Triggered!  Category:Chat Param:%s File:%s', params.Message, entry.Sound));
+            end
+        end
+    end
+end
+
 windower.register_event('incoming chunk', function(id, data)
+    if (id == 0x00A) then
+        local packet = packets.parse('incoming', data);
+        local name = packet['Player Name'];
+        if name ~= currentName then
+            BuildPatterns(name);
+            currentName = name;
+        end
+    end
+    if (id == 0x017) then
+        local player = (windower.ffxi.get_player() or {});
+        local packet = packets.parse('incoming', data);
+        if (packet.Mode == 12) or (packet.GM) then
+            EvaluateTriggers('ChatMon', 'GM');
+        end
+        if (packet.Mode == 3) and (packet['Sender Name'] ~= player.name) then
+            EvaluateTriggers('ChatMon', 'Tell');
+        end
+        if (player.name ~= nil) and (packet.Message:lower():contains(player.name:lower())) then
+            EvaluateTriggers('ChatMon', 'Talk');
+        end
+        local params = {
+            Message = packet.Message,
+            LowerMessage = string.lower(packet.Message),
+            Mode = res.chat[packet.Mode].en,
+            Sender = packet['Sender Name'],
+        };
+        EvaluateChat(params);
+    end
     if (id == 0x28) then
         local packet = ParseActionPacket(data);
         local ids = GetTriggerIds();
@@ -172,7 +285,7 @@ windower.register_event('incoming chunk', function(id, data)
                         end
 
                         --Monster uses ability..
-                    elseif (T { 100, 119, 734, 738 }:contains(messageId)) then
+                    elseif (T { 100, 102, 108, 110, 119, 122, 734, 738 }:contains(messageId)) then
                         local abilityData = res.job_abilities[packet.Id];
                         if abilityData then
                             EvaluateTriggers("MobUses", abilityData.en);
@@ -255,15 +368,75 @@ windower.register_event('incoming chunk', function(id, data)
     if id == 0x029 then
         local action_message = packets.parse('incoming', data);
         local ids = GetTriggerIds();
-        if (action_message['Actor'] == ids[1]) and T { 64, 204, 206, 321, 322, 341, 342, 343, 344, 350, 351, 378, 531, 647 }:contains(action_message.Message) then
-            if EvaluateTriggers("LostBuff", action_message['Param 1']) == false then
-                local buffData = res.buffs[action_message['Param 1']];
-                if buffData then
-                    EvaluateTriggers("LostBuff", buffData.en);
+        if (action_message['Actor'] == ids[1]) then
+            if T { 64, 204, 206, 321, 322, 341, 342, 343, 344, 350, 351, 378, 531, 647 }:contains(action_message.Message) then                
+                local trigger = (action_message.Target > 1000000) and "LostDebuff" or "LostBuff";
+                if EvaluateTriggers(trigger, action_message['Param 1']) == false then
+                    local buffData = res.buffs[action_message['Param 1']];
+                    if buffData then
+                        EvaluateTriggers(trigger, buffData.en);
+                    end
                 end
+            else
+                EvaluateTriggers('MiscActions', action_message.Message);
             end
-        else
-            EvaluateTriggers('MiscActions', action_message.Message);
+        end
+    end
+
+    if id == 0x21 then
+        EvaluateTriggers('ChatMon', 'Trade');
+    end
+
+    if id == 0x0DC then
+        EvaluateTriggers('ChatMon', 'Invite');
+    end
+end);
+
+local function EvaluateText(params)
+    for _,entry in ipairs(triggers.AllText) do
+        if EvaluateChatEntry(entry, params) and type(entry.Sound) == 'string' then
+            windower.play_sound(string.format("%sresources/audio/%s", windower.addon_path, entry.Sound));
+            if settings.Debug then
+                print(string.format('Triggered!  Category:Text Param:%s File:%s', params.Message, entry.Sound));
+            end
+        end
+    end
+end
+
+windower.register_event('emote', function(emote_id,sender_id,target_id)
+    local myId = (windower.ffxi.get_player() or {}).id;
+    if target_id == myId and sender_id ~= myId then
+        EvaluateTriggers('ChatMon', 'Emote');
+    end
+end)
+
+windower.register_event('examined', function(sender_name,sender_index)
+    local myName = (windower.ffxi.get_player() or {}).name;
+    if sender_name ~= myName then
+        EvaluateTriggers('ChatMon', 'Examine');
+    end
+end)
+
+windower.register_event('incoming text', function(original,modified,mode)
+    local params = {
+        Message = original,
+        LowerMessage = string.lower(original),
+        Mode = mode,
+    };
+    EvaluateText(params);
+end)
+
+windower.register_event('addon command', function(...)
+    local args = T{...};
+    if args[1] == 'dumpdat' then
+        local zoneId = tonumber(args[2]);
+        if zoneId then
+            local zoneData = res.zones[zoneId];
+            local folderPath = "C:/Windower/addons/dumps";--string.format("%sdumps/", windower.addon_path);
+            windower.create_dir(folderPath);
+            local filePath = string.format("%s%u_%s.txt", folderPath, zoneId, zoneData and zoneData.en or "Unknown");
+            print(filePath);
+            --message:DumpToFile(zoneId, filePath);
         end
     end
 end);

@@ -1,5 +1,5 @@
 --[[
-    This triggers when you lose a buff or one of your applied buffs or debuffs expires on a player.
+    This triggers when you lose a buff or one of your applied buffs or debuffs expires on a monster.
     You can specify buffs by either the buff name(must be exactly the same as game uses) or the ID.
 ]]--
 
